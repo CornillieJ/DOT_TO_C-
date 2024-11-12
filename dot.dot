@@ -1,0 +1,118 @@
+digraph G {
+    
+    fontname = "Bitstream Vera Sans";
+    fontsize = 8;
+    rankdir="TB"
+    
+    node [fontname = "Bitstream Vera Sans"; fontsize = 8; shape = "Mrecord"];
+    
+    edge [fontname = "Bitstream Vera Sans"; fontsize = 8;];
+   
+
+    Passenger
+    [label = 
+    <{<B>Passenger</B> | 
+        - id: Guid<br />
+        - name: string<br />
+        - surname: string<br />
+        - dob: DateTime<br />
+        - seatNumber: string<br />
+        - seatPrice: decimal<br /> 
+        - luggage: ICollection&lt;Luggage&gt; <br /> 
+        |
+        + Passenger(string, string, DateTime, string, ICollection&lt;Luggage&gt;)<br />
+        + GetAge(): int<br />
+        + GetFullName(): string <br />
+        + GetId(): Guid<br />
+        + GetName(): string<br />
+        + GetSurname(): string<br />
+        + GetDob(): DateTime<br />
+        + GetSeatNumber(): string<br />
+        + SetSeatNumber(string)<br />
+        + GetSeatPrice(): decimal<br />
+        + SetSeatPrice(decimal)<br />
+        + GetLuggage(): IEnumerable&lt;Luggage&gt;
+    }>]
+   
+    Airport
+    [label = 
+        <{<B>Airport</B> | - id: Guid<br /> - name: string<br />- location: Location<br />- address: string<br /> | 
+        + Airport(string, Location string)<br />
+        + GetName(): string<br />
+        + SetName(string)<br />
+        + GetLocation(): Location<br />
+        + GetAddress(): string
+    }>
+    ]
+
+    Plane
+    [label = 
+    <{<B>Plane</B> | - capacity: int<br />- model: string<br />- maxWeight: double<br /> - registrationDate: DateTime<br />| + Plane( int, string, double, DateTime)<br /> + GetCapacity(): int<br /> + GetModel(): string<br /> + GetMaxWeight(): double<br /> + GetRegistrationDate(): DateTime<br /> + GetYearsInService(): int<br /> }>
+    ]
+
+    Luggage
+    [label = 
+    <{<B>Luggage</B> | - id: Guid<br />- weight: double<br />- price: decimal<br /> | + Luggage(double, decimal)<br /> + GetId(): Guid<br />+ GetWeight(): double<br />+ GetPrice(): decimal<br /> }>
+    ]
+
+    Location
+    [label = 
+    <{<B>Location</B> | - lat: double<br /> - lng: double<br /> | + Location(double, double)<br /> + GetLat():double<br /> + GetLng(): double<br /> }>
+    ]
+    
+    Booking
+    [label = 
+    <{<B>Booking</B> | - bookingDate: DateTime<br /> - passengers: ICollection&lt;Passenger&gt;<br /> | + Booking(DateTime, ICollection&lt;Passenger&gt;)<br /> + GetTotalPrice(): decimal<br /> + GetBookingDate(): DateTime<br /> + GetPassengers(): IEnumerable&lt;Passenger&gt;<br />}>
+    ]
+
+    Flight
+    [label = 
+    <{<B>Flight</B> | - id: Guid<br /> - flightNo: string<br /> - departFrom: Airport<br />- arriveAt: Airport<br />- airplane: Plane<br /> - departureTime: DateTime<br />- arrivalTime: DateTime<br />- bookings: ICollection&lt;Booking&gt;<br /> | 
+        + Flight(string, Aiport, Airport, Plane, DateTime, DateTime)<br />
+        + GetId(): Guid<br />
+        + GetFlightNo(): string<br />
+        + GetDepartFrom(): Airport<br />
+        + GetArriveAt(): Airport<br />
+        + GetPlane(): Plane<br />
+        + SetPlane(Plane)<br /> 
+        + GetArrivalTime(): DateTime<br />
+        + SetArrivalTime(DateTime)<br />
+        + GetDepartureTime(DateTime)<br />
+        + SetDepartureTime(DateTime)<br />
+        + GetTotalTravelTime(): TimeSpan<br />
+        + GetBookings(): IEnumerable&lt;Booking&gt;<br />
+        + AddBooking(Booking)<br />
+    }>
+    ]
+    
+    FlightRepository
+    [label = 
+    <{<B>FlightRepository</B> | - flights: ICollection&lt;Flight&gt;<br /> | 
+        + GetFlightWithTheMostPassengers(): Flight<br />
+        + GetFlightsThatArrivedAfter(DateTime): IEnumerable&lt;Flight&gt;<br />
+        + GetFlightsWithPassengersOlderThan(int) IEnumerable&lt;Flight&gt;<br />
+        + GetFlightsWhereMaxWeightPlaneAboveAverage():IEnumerable&lt;Flight&gt;<br />
+        + GetFlightWithHighestTotalBookingPrice(): Flight <br />
+        + AddFlight(Flight)<br />
+    }>
+    ]
+    
+    Flight->Airport[dir=none label="departure"]
+    Flight->Airport[dir=none label="arrival"]
+    Flight->Plane[dir=none]
+    Flight->Booking[dir=none headlabel="*"]
+    Airport->Location[dir=none]
+
+    Booking->Passenger[dir=none headlabel="1..*"]
+    Passenger->Luggage[dir=none headlabel="*"]
+    
+    FlightRepository -> Flight[dir=none headlabel="*"]
+
+    node [fontname = "Bitstream Vera Sans"; fontsize = 8; shape = "record" style=dashed];
+    FlightNote
+    [label = 
+    <{ De constructor van Flight ontvangt <br/>de parameters in de volgorde waarin <br/>ze gedefiniëerd werden in het schema }>
+    ]
+    
+    FlightNote->Flight[dir=none style=dotted]
+}
