@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 
 if len(sys.argv) > 1:
     FILE_PATH = sys.argv[1]
@@ -23,6 +24,15 @@ def read_uml(file_path):
     file = open(file_path, 'r')
     content = file.read()
     return content
+
+
+def split_on_casing(text):
+    split_text = re.sub(
+        r'(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|(?<=[\w])(?=\d)|(?<=\d)(?=\w)',
+        ' ',
+        text
+    )
+    return split_text
 
 def is_line_relevant(line):
     for word in IGNORE_LIST:
@@ -86,7 +96,7 @@ def get_texts(class_segments):
                 if not prop.strip(): continue
                 prop = prop.replace(' ', '')
                 if is_enum:
-                    value = prop.replace('br','').strip('<\\/>').strip()
+                    value = prop.replace('br','').replace(',','').strip().strip('<\\/>').strip()
                     prop_names.append(value)
                     prop_types.append('enum')
                     prop_set.append(False)
@@ -136,9 +146,9 @@ def get_texts(class_segments):
             fields.append(prop_text[prop_text.find('_')+1: prop_text.find(';')])
     for i, method in enumerate(methods_texts):
         for field in fields:
-            if f'{field.capitalize()} =' in method:
-                methods_texts[i] = method.replace(field.capitalize(),f'_{field}')
-
+            capitalized_field = field[0].upper() + field[1:]
+            if f'{capitalized_field} =' in method:
+                methods_texts[i] = method.replace(capitalized_field,f'_{field}')
     return property_texts, methods_texts
 
 def build_properties(prop_names, prop_types, prop_get, prop_set, get_accessors, set_accessors):
@@ -153,7 +163,8 @@ def build_properties(prop_names, prop_types, prop_get, prop_set, get_accessors, 
         elif prop_get[i] == False:
             current_prop = f'private {prop_types[i]} _{prop_name};'
         else:
-            current_prop = 'public ' + prop_types[i] + " " + prop_name.capitalize() + ' { '
+            prop_name = prop_name[0].upper() + prop_name[1:]
+            current_prop = 'public ' + prop_types[i] + " " + prop_name + ' { '
             if prop_get[i]:
                 current_prop += f'{get_accessors[i]} get; '
             if prop_set[i]:
@@ -225,9 +236,13 @@ def fill_constructor(method, class_name, prop_types, prop_names, method_text):
                     null_check = ''
                     if param_type.strip().lower() == 'string':
                         constructor_assignments.append(f'if (string.IsNullOrWhiteSpace({prop_names[j]}))')
-                        constructor_assignments.append(f'\t throw new ArgumentNullException(nameof({prop_names[j]}), "{prop_names[j]} cannot be null or empty.");')
+                        split_prop = split_on_casing(prop_names[j])
+                        split_prop = split_prop[0] + split_prop[1:]
+                        constructor_assignments.append(f'\t throw new ArgumentNullException(nameof({prop_names[j]}), "{split_prop} cannot be null or empty.");')
                     elif param_type.strip().lower() not in NON_NULLABLE_TYPES or '?' in param_type.strip():
-                        null_check = f' ?? throw new ArgumentNullException(nameof({prop_names[j]}),"{prop_names[j]} cannot be null")'
+                        split_prop = split_on_casing(prop_names[j])
+                        split_prop = split_prop[0] + split_prop[1:]
+                        null_check = f' ?? throw new ArgumentNullException(nameof({prop_names[j]}),"{split_prop} cannot be null")'
                     params[i] = capitalize_type_correctly(params[i].lstrip())
                     params[i] += ' ' + prop_names[j]
                     constructor_assignments.append(f'{prop_names[j].capitalize()} = {prop_names[j]}{null_check};')
@@ -258,7 +273,8 @@ def capitalize_type_correctly(type):
         return type
     if type.strip().lower() == 'datetime':
         return 'DateTime'
-    type = type.lstrip().capitalize()
+    type = type.strip()
+    type = type[0].upper() + type[1:]
     if any(interface in type.lower() for interface in KNOWN_INTERFACES):
         return_list = list(type)
         return_list[1] = return_list[1].upper()
