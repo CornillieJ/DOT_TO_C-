@@ -179,6 +179,19 @@ def remember_interfaces(sections):
                 current_class_name = normalize_class_name(current_class_name, current_class_type)
                 if 'interface' in current_class_type:
                     KNOWN_INTERFACES.append(current_class_name.lower())
+def remember_enums(sections):
+    for section in sections:
+        class_block = get_string_between(section,'<{','}>')
+        segments = class_block.split('|')
+        for segment in segments:
+            if '<b>' in segment.lower():
+                current_class_name = get_string_between(segment,'<b>','</b>').replace('&lt;','').replace('&gt;','')
+                if current_class_name == '': current_class_name =  get_string_between(segment,'<B>','</B>').replace('&lt;','').replace('&gt;','')
+                current_class_type = get_class_type(current_class_name)
+                current_class_name = normalize_class_name(current_class_name, current_class_type)
+                if 'enum' in current_class_type:
+                    NON_NULLABLE_TYPES.append(current_class_name.lower())
+
 
 def build_method_text(method,class_name,prop_types,prop_names):
     return_type = ' void '
@@ -326,12 +339,13 @@ def write_files(indent, segments, prop_texts, method_texts):
     file.write('}')
 
 import_interfaces()
-# project_name = input('what is the project name?: ')
-project_name = 'test'
+project_name = input('what is the project name?: ')
+# project_name = 'test'
 os.makedirs("output", exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 sections = get_section()
 remember_interfaces(sections)
+remember_enums(sections)
 for section in sections:
     indent = ''
     if section.find('label') < 0: continue  
