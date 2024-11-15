@@ -37,7 +37,7 @@ digraph G {
     Airport
     [label = 
         <{<B>Airport</B> | - id: Guid<br /> - name: string<br />- location: Location<br />- address: string<br /> | 
-        + Airport(string, Location string)<br />
+        + Airport(string, Location, string)<br />
         + GetName(): string<br />
         + SetName(string)<br />
         + GetLocation(): Location<br />
@@ -68,7 +68,7 @@ digraph G {
     Flight
     [label = 
     <{<B>Flight</B> | - id: Guid<br /> - flightNo: string<br /> - departFrom: Airport<br />- arriveAt: Airport<br />- airplane: Plane<br /> - departureTime: DateTime<br />- arrivalTime: DateTime<br />- bookings: ICollection&lt;Booking&gt;<br /> | 
-        + Flight(string, Aiport, Airport, Plane, DateTime, DateTime)<br />
+        + Flight(string, Airport, Airport, Plane, DateTime, DateTime)<br />
         + GetId(): Guid<br />
         + GetFlightNo(): string<br />
         + GetDepartFrom(): Airport<br />
