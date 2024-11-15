@@ -12,6 +12,13 @@ IGNORE_LIST = ['digraph','fontname','fontsize','rankdir','node', 'edge']
 PRIMITIVE_TYPES = ['string','int','double','decimal','float','bool','long','void']
 NON_NULLABLE_TYPES = ['int','double','decimal','float','bool','long','void', 'datetime']
 KNOWN_INTERFACES = ['ienumerable','icountable','icollection']
+def import_interfaces():
+    if os.path.exists('interfaces_import.txt'):
+        file = open('interfaces_import.txt','r')
+        content = file.read()
+        for interface in content.splitlines():
+            if interface.strip() not in KNOWN_INTERFACES:
+                KNOWN_INTERFACES.append(interface.strip())
 def read_uml(file_path):
     file = open(file_path, 'r')
     content = file.read()
@@ -59,27 +66,44 @@ def get_texts(class_segments):
     methods_included = []
     methods_texts=[]
     is_interface = False
+    is_enum = False
+    current_class_name = ''
     for i,segment in enumerate(class_segments):
         segment = segment.replace('&lt;','<').replace('&gt;','>')
         if i == 0: 
             current_class_name = get_string_between(segment,'<b>','</b>').replace('&lt;','').replace('&gt;','')
+            if current_class_name == '': current_class_name =  get_string_between(segment,'<B>','</B>').replace('&lt;','').replace('&gt;','')
             current_class_type = get_class_type(current_class_name)
             current_class_name = normalize_class_name(current_class_name, current_class_type) 
-            if 'interface' in segment:
+            if 'interface' in current_class_type:
                 is_interface = True
+            if 'enum' in current_class_type:
+                is_enum = True
             continue
         if i == 1 and is_interface == False:
             properties = segment.splitlines()
             for prop in properties:
                 if not prop.strip(): continue
                 prop = prop.replace(' ', '')
-                prop_names.append(get_string_between(prop, '-', ':'))
-                prop_types.append(prop[prop.find(':') + 1:])
-                prop_set.append(False)
-                prop_set_accessors.append('')
-                prop_get_accessors.append('')
-                prop_get.append(False)
+                if is_enum:
+                    value = prop.replace('br','').strip('<\\/>').strip()
+                    prop_names.append(value)
+                    prop_types.append('enum')
+                    prop_set.append(False)
+                    prop_get.append(False)
+                    prop_set_accessors.append('')
+                    prop_get_accessors.append('')
+                else:
+                    prop_names.append(get_string_between(prop, '-', ':'))
+                    prop_types.append(prop[prop.find(':') + 1:])
+                    prop_set.append(False)
+                    prop_set_accessors.append('')
+                    prop_get_accessors.append('')
+                    prop_get.append(False)
         else:
+            if is_enum:
+                is_enum = False
+                continue
             methods = segment.splitlines()
             if is_interface == True:
                 is_interface = False
@@ -89,22 +113,22 @@ def get_texts(class_segments):
                 methods_included[m] = True
                 for j,prop_name in enumerate(prop_names):
                     method = method.replace('&lt;','<').replace('&gt;','>')
-                    if method.find('get' + prop_name)>= 0:
+                    if method.lower().find('get' + prop_name.lower() + '(')>= 0:
                         methods_included[m] = False
                         prop_get[j] = True
                         prop_get_accessors[j] = get_accessor(method)
-                    if method.find('set' + prop_name)>= 0:
+                    if method.lower().find('set' + prop_name.lower() + '(')>= 0:
                         methods_included[m] = False
                         prop_set[j] = True
                         prop_set_accessors[j] = get_accessor(method)
                 if methods_included[m]:
                     (method_text,constructor_assignments) = build_method_text(method,current_class_name,prop_types, prop_names)
-                    methods_texts.append(method_text)
+                    methods_texts.append(method_text.replace('datetime', 'DateTime'))
                     methods_texts.append('{')
                     for assignment in constructor_assignments:
                         methods_texts.append(assignment)
                     methods_texts.append('}')
-                    
+
     property_texts = build_properties(prop_names, prop_types, prop_get, prop_set, prop_get_accessors, prop_set_accessors)
     fields = []
     for prop_text in property_texts:
@@ -112,7 +136,7 @@ def get_texts(class_segments):
             fields.append(prop_text[prop_text.find('_')+1: prop_text.find(';')])
     for i, method in enumerate(methods_texts):
         for field in fields:
-            if field.capitalize() in method:
+            if f'{field.capitalize()} =' in method:
                 methods_texts[i] = method.replace(field.capitalize(),f'_{field}')
 
     return property_texts, methods_texts
@@ -124,7 +148,9 @@ def build_properties(prop_names, prop_types, prop_get, prop_set, get_accessors, 
         if prop_name == '' or prop_types[i] == '': 
             continue
         prop_types[i] = capitalize_type_correctly(prop_types[i])
-        if prop_get[i] == False:
+        if prop_types[i].lower() == 'enum':
+            current_prop = f'{prop_name},'
+        elif prop_get[i] == False:
             current_prop = f'private {prop_types[i]} _{prop_name};'
         else:
             current_prop = 'public ' + prop_types[i] + " " + prop_name.capitalize() + ' { '
@@ -146,8 +172,9 @@ def remember_interfaces(sections):
         class_block = get_string_between(section,'<{','}>')
         segments = class_block.split('|')
         for segment in segments:
-            if '<b>' in segment:
+            if '<b>' in segment.lower():
                 current_class_name = get_string_between(segment,'<b>','</b>').replace('&lt;','').replace('&gt;','')
+                if current_class_name == '': current_class_name =  get_string_between(segment,'<B>','</B>').replace('&lt;','').replace('&gt;','')
                 current_class_type = get_class_type(current_class_name)
                 current_class_name = normalize_class_name(current_class_name, current_class_type)
                 if 'interface' in current_class_type:
@@ -165,7 +192,7 @@ def build_method_text(method,class_name,prop_types,prop_names):
         colon_index = method.find(':')
         return_type = method[colon_index+1:].lstrip()
         return_type = capitalize_type_correctly(return_type)
-    method_text = method[:accessor_index] + abstract + return_type + ' ' + method[accessor_index:colon_index].lstrip().capitalize()
+    method_text = method[:accessor_index] + abstract + return_type + ' ' + method[accessor_index:colon_index].lstrip()
     method_text = ' '.join(method_text.split())
     (method_text,constructor_assignments) = fill_constructor(method, class_name, prop_types, prop_names, method_text)
     method_text = method_text.strip().replace('  ',' ')
@@ -173,13 +200,15 @@ def build_method_text(method,class_name,prop_types,prop_names):
 
 def fill_constructor(method, class_name, prop_types, prop_names, method_text):
     constructor_assignments = []
-    if class_name.lower() + '(' in method_text.lower():
+    if ' ' + class_name.strip().lower() + '(' in method_text.lower():
         method_text = method_text.replace(' void','')
         params = get_string_between(method,'(',')').split(',')
         start = 0
+        indexes_already_done = []
         for i, param_type in enumerate(params):
-            for j in range(start,len(prop_types)):
-                if param_type.strip() in prop_types[j] and param_type != '':
+            for j in range(0,len(prop_types)):
+                if j in indexes_already_done: continue
+                if param_type.strip().lower() == prop_types[j].strip().lower() and param_type != '':
                     null_check = ''
                     if param_type.strip().lower() == 'string':
                         constructor_assignments.append(f'if (string.IsNullOrWhiteSpace({prop_names[j]}))')
@@ -189,10 +218,10 @@ def fill_constructor(method, class_name, prop_types, prop_names, method_text):
                     params[i] = capitalize_type_correctly(params[i].lstrip())
                     params[i] += ' ' + prop_names[j]
                     constructor_assignments.append(f'{prop_names[j].capitalize()} = {prop_names[j]}{null_check};')
-                    start = j+1
+                    indexes_already_done.append(j)
                     break
         method_text = method_text[:method_text.find('(')+1] + ', '.join(params) + method_text[method_text.find(')'):]
-    return (method_text, constructor_assignments)
+    return method_text, constructor_assignments
 
 def process_accessors(method):
     accessor_index = 0
@@ -233,11 +262,13 @@ def get_class_type(class_name):
         return 'abstract class'
     elif class_name.lower().find('interface') >= 0:
         return 'interface'
+    elif class_name.lower().find('enum') >= 0:
+        return 'enum'
     else:
         return 'class'
 
 def normalize_class_name(class_name, class_type):
-    name = class_name.replace('interface','').replace('abstract','').strip().capitalize()
+    name = class_name.replace('interface','').replace('abstract','').replace('enum','').replace('<','').replace('>','').strip()
     if 'interface' in class_type:
         name_list = list(name)
         name_list[1] = name_list[1].upper()
@@ -268,6 +299,7 @@ def write_files(indent, segments, prop_texts, method_texts):
         class_name = ''
         if i == 0:
             class_name = get_string_between(segment,'<b>','</b>').replace('&lt;','').replace('&gt;','')
+            if class_name == '': class_name =  get_string_between(segment,'<B>','</B>').replace('&lt;','').replace('&gt;','')
             class_type = get_class_type(class_name)
             class_name = normalize_class_name(class_name, class_type)
             if class_name == '':
@@ -293,9 +325,9 @@ def write_files(indent, segments, prop_texts, method_texts):
             indent += '\t'
     file.write('}')
 
-
-project_name = input('what is the project name?: ')
-# project_name = 'test'
+import_interfaces()
+# project_name = input('what is the project name?: ')
+project_name = 'test'
 os.makedirs("output", exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 sections = get_section()
@@ -303,7 +335,7 @@ remember_interfaces(sections)
 for section in sections:
     indent = ''
     if section.find('label') < 0: continue  
-    class_block = get_string_between(section,'<{','}>').lower()
+    class_block = get_string_between(section,'<{','}>')
     segments = class_block.split('|')
     if class_block == '': continue
     (prop_texts,method_texts) = get_texts(segments)
